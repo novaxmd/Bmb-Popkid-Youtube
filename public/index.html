@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bmb Tech </title>
+<style>
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #0d0d1a;
+    color: #fff;
+    margin: 0;
+    padding: 20px;
+}
+h1 { text-align:center; font-size:2.5em; margin-bottom:20px; }
+.search-container { text-align:center; margin:20px 0; position:relative; }
+.search-container input { padding:10px; width:50%; font-size:1em; border-radius:5px; border:none; }
+.search-container button { padding:10px 15px; margin-left:10px; border-radius:5px; border:none; background-color:#00ffcc; cursor:pointer; transition:0.3s; }
+.search-container button:hover { background-color:#00b399; transform:scale(1.05); }
+.loader { display:none; margin-left:10px; border:4px solid #f3f3f3; border-top:4px solid #00ffcc; border-radius:50%; width:20px; height:20px; animation:spin 1s linear infinite; }
+@keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);} }
+.song-list { max-width:900px; margin:20px auto; border-radius:10px; overflow:hidden; }
+.song-item { background-color:#1a1a2e; border-radius:10px; margin-bottom:20px; padding:10px; box-shadow:0 0 15px rgba(0,255,204,0.3); }
+.song-item:hover { background-color:#222244; }
+.song-info { display:flex; flex-direction:column; align-items:center; text-align:center; position:relative; }
+.song-info img { width:100%; max-width:400px; height:auto; border-radius:8px; margin-bottom:10px; cursor:pointer; }
+.play-overlay {
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:60px;
+    height:60px;
+    background: rgba(0,0,0,0.5);
+    border-radius:50%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    cursor:pointer;
+    font-size:30px;
+    color:#fff;
+}
+.song-title { font-size:1.1em; font-weight:bold; margin-bottom:5px; }
+.song-artist { font-size:0.9em; color:#ccc; margin-bottom:5px; }
+.song-duration { font-size:0.85em; color:#aaa; margin-bottom:10px; }
+.song-buttons { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+button.download-btn {
+    padding:8px 15px; 
+    border:none; 
+    border-radius:8px; 
+    cursor:pointer; 
+    font-size:0.9em; 
+    font-weight:bold;
+    color:#000;
+    transition:0.3s; 
+    background:linear-gradient(45deg,#ffcc00,#ffaa00);
+}
+button.download-btn:hover { transform:scale(1.1) rotate(-2deg); box-shadow:0 0 10px rgba(255,204,0,0.5);}
+video { width:100%; border-radius:8px; margin-top:10px; background:#000; display:none; }
+.no-results { text-align:center; padding:20px; font-size:1.2em; color:#ff5555; }
+</style>
+</head>
+<body>
+
+<h1>Bmb Tech</h1>
+
+<div class="search-container">
+    <input type="text" id="searchInput" placeholder="Search for songs or videos...">
+    <button onclick="searchMedia()">Search</button>
+    <div class="loader" id="loader"></div>
+</div>
+
+<div class="song-list" id="songList"></div>
+<div class="no-results" id="noResults" style="display:none;">No media found</div>
+
+<script>
+const apiYTSearch = "https://eliteprotech-apis.zone.id/ytsearch?q=";
+const apiSpotify = "https://eliteprotech-apis.zone.id/spotify1?q=";
+const apiYTDLMP3 = "https://eliteprotech-apis.zone.id/ytdown?format=mp3&url=";
+const apiYTDLMP4 = "https://eliteprotech-apis.zone.id/ytdown?format=mp4&url=";
+
+let allMedia = [];
+
+// Display media with clickable thumbnail for play
+function displayMedia(list){
+    const container = document.getElementById('songList');
+    container.innerHTML='';
+    if(list.length===0){
+        document.getElementById('noResults').style.display='block';
+        return;
+    }
+    document.getElementById('noResults').style.display='none';
+
+    list.forEach(item=>{
+        const div = document.createElement('div');
+        div.className='song-item';
+        div.innerHTML=`
+            <div class="song-info">
+                <img src="${item.thumbnail || 'https://via.placeholder.com/400'}" alt="${item.title}">
+                <div class="play-overlay">&#9658;</div>
+                <div class="song-title">${item.title}</div>
+                <div class="song-artist">${item.artist || 'Unknown'}</div>
+                <div class="song-duration">${item.duration || ''}</div>
+            </div>
+            <div class="song-buttons">
+                <button class="download-btn">Download Audio</button>
+                <button class="download-btn">Download Video</button>
+            </div>
+            <video controls></video>
+        `;
+        const thumb = div.querySelector('img');
+        const overlay = div.querySelector('.play-overlay');
+        const videoPlayer = div.querySelector('video');
+        const downloadAudioBtn = div.querySelectorAll('.download-btn')[0];
+        const downloadVideoBtn = div.querySelectorAll('.download-btn')[1];
+
+        // Click thumbnail/overlay to play video
+        const playVideo = ()=>{
+            fetch(apiYTDLMP4 + encodeURIComponent(item.url))
+            .then(resp=>resp.json())
+            .then(data=>{
+                if(data.success && data.downloadURL){
+                    videoPlayer.src = data.downloadURL;
+                    videoPlayer.style.display='block';
+                    overlay.style.display='none';
+                    thumb.style.display='none';
+                    videoPlayer.play().catch(err=>alert('Cannot play video online.'));
+                } else alert('Video stream failed.');
+            }).catch(err=>alert('Error streaming video.'));
+        }
+        thumb.addEventListener('click', playVideo);
+        overlay.addEventListener('click', playVideo);
+
+        // Downloads
+        downloadAudioBtn.addEventListener('click', ()=>{
+            fetch(apiYTDLMP3 + encodeURIComponent(item.url))
+            .then(resp=>resp.json())
+            .then(data=>{
+                if(data.success && data.downloadURL){
+                    const a = document.createElement('a');
+                    a.href = data.downloadURL;
+                    a.download = item.title+'.mp3';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else alert('Audio download failed.');
+            }).catch(err=>alert('Error downloading audio.'));
+        });
+        downloadVideoBtn.addEventListener('click', ()=>{
+            fetch(apiYTDLMP4 + encodeURIComponent(item.url))
+            .then(resp=>resp.json())
+            .then(data=>{
+                if(data.success && data.downloadURL){
+                    const a = document.createElement('a');
+                    a.href = data.downloadURL;
+                    a.download = item.title+'.mp4';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else alert('Video download failed.');
+            }).catch(err=>alert('Error downloading video.'));
+        });
+
+        container.appendChild(div);
+    });
+}
+
+// Fetch media
+async function fetchMedia(query){
+    let mediaList = [];
+    try{
+        const ytResp = await fetch(apiYTSearch + encodeURIComponent(query));
+        const ytData = await ytResp.json();
+        if(ytData.success && ytData.results.videos.length>0){
+            ytData.results.videos.forEach(v=>{
+                mediaList.push({title:v.title, artist:v.author.name, thumbnail:v.thumbnail, duration:v.duration, url:v.url});
+            });
+        }
+    }catch(err){ console.error(err); }
+
+    try{
+        const spResp = await fetch(apiSpotify + encodeURIComponent(query));
+        const spData = await spResp.json();
+        if(spData.success && spData.results){
+            spData.results.forEach(t=>{
+                mediaList.push({title:t.title, artist:t.artist, thumbnail:t.thumbnail, duration:t.duration, url:t.url});
+            });
+        }
+    }catch(err){ console.error(err); }
+
+    return mediaList;
+}
+
+// Search media
+async function searchMedia(){
+    const query = document.getElementById('searchInput').value.trim();
+    if(!query) return;
+    document.getElementById('loader').style.display='inline-block';
+    try{
+        allMedia = await fetchMedia(query);
+        displayMedia(allMedia);
+        document.getElementById('loader').style.display='none';
+    }catch(err){
+        console.error(err);
+        document.getElementById('loader').style.display='none';
+        alert('Error fetching media.');
+    }
+}
+</script>
+
+</body>
+</html>
